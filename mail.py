@@ -17,6 +17,18 @@ class ChatApp:
         self.PORT = 5000
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         
+        # Añadir nickname
+        self.nickname = ""
+        self.nickname_frame = tk.Frame(self.window)
+        self.nickname_frame.pack(padx=10, pady=5)
+        
+        self.nickname_entry = tk.Entry(self.nickname_frame, width=15)
+        self.nickname_entry.insert(0, "Tu nickname")
+        self.nickname_entry.pack(side=tk.LEFT, padx=5)
+        
+        self.nickname_button = tk.Button(self.nickname_frame, text="Guardar Nick", command=self.set_nickname)
+        self.nickname_button.pack(side=tk.LEFT)
+        
         # Configuración del cifrado
         password = "ChatSecureKey2024"  # Clave maestra para generar la clave de cifrado
         salt = b'salt_'  # Salt para el KDF
@@ -52,19 +64,27 @@ class ChatApp:
         except:
             messagebox.showerror("Error", "No se pudo iniciar el servidor")
             
+    def set_nickname(self):
+        self.nickname = self.nickname_entry.get()
+        self.nickname_entry.config(state='disabled')
+        self.nickname_button.config(state='disabled')
+        messagebox.showinfo("Éxito", f"Nickname establecido como: {self.nickname}")
+
     def send_message(self):
         try:
             dest_ip = self.dest_ip.get()
             message = self.msg_entry.get()
-            if message and dest_ip:
+            if message and dest_ip and self.nickname:
                 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 client.connect((dest_ip, self.PORT))
-                # Cifrar el mensaje antes de enviarlo
-                encrypted_message = self.cipher_suite.encrypt(f"{self.HOST}: {message}".encode())
+                # Usar nickname en lugar de HOST
+                encrypted_message = self.cipher_suite.encrypt(f"{self.nickname}: {message}".encode())
                 client.send(encrypted_message)
                 client.close()
                 self.chat_area.insert(tk.END, f"Tú: {message}\n")
                 self.msg_entry.delete(0, tk.END)
+            elif not self.nickname:
+                messagebox.showerror("Error", "Por favor establece un nickname primero")
         except:
             messagebox.showerror("Error", "No se pudo enviar el mensaje")
             
