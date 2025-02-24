@@ -27,9 +27,11 @@ class ChatApp:
         
         # Configurar archivos de datos
         self.ips_file = os.path.join(self.data_dir, "saved_ips.json")
+        self.last_ip_file = os.path.join(self.data_dir, "last_ip.json")
         self.nickname_file = os.path.join(self.data_dir, "nickname.json")
         
         self.saved_ips = self.load_saved_ips()
+        self.last_ip = self.load_last_ip()
         self.nickname = self.load_nickname()
         
         # Añadir nickname
@@ -75,7 +77,10 @@ class ChatApp:
         # Combobox para IPs guardadas
         self.ip_combo = ttk.Combobox(self.ip_frame, width=15, values=list(self.saved_ips))
         self.ip_combo.pack(side=tk.LEFT, padx=5)
-        self.ip_combo.set("Selecciona IP")
+        if self.last_ip and self.last_ip in self.saved_ips:
+            self.ip_combo.set(self.last_ip)
+        else:
+            self.ip_combo.set("Selecciona IP")
         
         # Entry para nueva IP
         self.dest_ip = tk.Entry(self.ip_frame, width=15)
@@ -129,6 +134,23 @@ class ChatApp:
             except:
                 messagebox.showerror("Error", "No se pudo guardar la IP")
 
+    def load_last_ip(self):
+        if os.path.exists(self.last_ip_file):
+            try:
+                with open(self.last_ip_file, 'r') as f:
+                    data = json.load(f)
+                    return data.get('last_ip', '')
+            except:
+                return ''
+        return ''
+
+    def save_last_ip(self, ip):
+        try:
+            with open(self.last_ip_file, 'w') as f:
+                json.dump({'last_ip': ip}, f)
+        except:
+            print("Error al guardar la última IP")
+
     def load_nickname(self):
         if os.path.exists(self.nickname_file):
             try:
@@ -169,8 +191,10 @@ class ChatApp:
                 self.chat_area.insert(tk.END, f"Tú: {message}\n")
                 self.msg_entry.delete(0, tk.END)
                 
-                # Guardar la IP usada
+                # Guardar la IP usada y como última IP
                 self.save_ip(dest_ip)
+                self.save_last_ip(dest_ip)
+                self.ip_combo.set(dest_ip)
             elif not self.nickname:
                 messagebox.showerror("Error", "Por favor establece un nickname primero")
         except:
@@ -182,8 +206,9 @@ class ChatApp:
             test_socket.settimeout(1)
             test_socket.connect((ip, self.PORT))
             
-            # Enviar mensaje de prueba
-            test_message = self.cipher_suite.encrypt(b"test_connection")
+            # Enviar mensaje de control especial
+            control_message = b"__CONTROL_CONNECTION_TEST__"
+            test_message = self.cipher_suite.encrypt(control_message)
             test_socket.send(test_message)
             test_socket.close()
             return True
@@ -217,14 +242,14 @@ class ChatApp:
             try:
                 client, address = self.socket.accept()
                 encrypted_message = client.recv(1024)
+                decrypted_message = self.cipher_suite.decrypt(encrypted_message).decode()
                 
-                # Ignorar mensajes de prueba de conexión
-                if encrypted_message == self.cipher_suite.encrypt(b"test_connection"):
+                # Verificar si es un mensaje de control
+                if decrypted_message == "__CONTROL_CONNECTION_TEST__":
                     client.close()
                     continue
                 
-                # Procesar mensajes normales
-                decrypted_message = self.cipher_suite.decrypt(encrypted_message).decode()
+                # Mostrar solo mensajes normales
                 self.chat_area.insert(tk.END, f"{decrypted_message}\n")
                 client.close()
             except Exception as e:
